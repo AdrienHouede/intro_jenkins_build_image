@@ -1,37 +1,45 @@
 pipeline {
-agent any
-environment {
-IMG_NAME = 'med-nginx'
-DOCKER_REPO = 'build-image-docker'
-             }
-             stages {
-                 stage('cleanUp') {
-                     steps {
-                        deleteDir()
-                     }
-                  }
-                  stage('Checkout SCM') {
-                      steps {
-git branch: 'main', url: 'https://github.com/medsrc/build-image-docker.git'
-                      }
-                   }
-                   stage('build') {
-                       steps {
-                           script {
-sh 'docker build -t ${IMG_NAME} .'
-sh 'docker tag ${IMG_NAME} ${DOCKER_REPO}:${IMG_NAME}'
-                             }
-                        }
-                   }
+    agent any
 
-                  stage('deploiement conteneur') {
-                      steps {
-                           script {
-  sh 'docker stop monapp'
-  sh 'docker rm monapp'
-  sh 'docker run -d --name monapp --hostname monapp -p 8585:80 ${IMG_NAME}'
-                           }
-                      }
-                  }
-             }
+    environment {
+        IMG_NAME = 'monapp-image'
+        DOCKER_REPO = 'build-image-docker'
+        CONTAINER_NAME = 'monapp'
+    }
+
+    stages {
+        stage('Clean Workspace') {
+            steps {
+                deleteDir()
+            }
         }
+
+        stage('Checkout SCM') {
+            steps {
+                git branch: 'main', url: 'https://github.com/medsrc/build-image-docker.git'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    sh 'docker build -t ${IMG_NAME} .'
+                    sh 'docker tag ${IMG_NAME} ${DOCKER_REPO}:${IMG_NAME}'
+                }
+            }
+        }
+
+        stage('Deploy Container') {
+            steps {
+                script {
+                    // Stop et supprime l'ancien conteneur s'il existe
+                    sh 'docker stop ${CONTAINER_NAME} || true'
+                    sh 'docker rm ${CONTAINER_NAME} || true'
+
+                    // Démarre un nouveau conteneur à partir de l'image créée
+                    sh 'docker run -d --name ${CONTAINER_NAME} --hostname ${CONTAINER_NAME} -p 8585:80 ${IMG_NAME}'
+                }
+            }
+        }
+    }
+}
